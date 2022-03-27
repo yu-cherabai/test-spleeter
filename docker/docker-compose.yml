@@ -10,7 +10,6 @@ services:
       - gcp_vidby_key:/gcp
     environment:
       GOOGLE_APPLICATION_CREDENTIALS: /gcp/gcp_vidby_key.json
-      WEBHOOK_HOST: http://staging.vidby.com
 
 volumes:
   gcp_vidby_key:

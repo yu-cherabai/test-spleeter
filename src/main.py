@@ -1,9 +1,11 @@
 import os
+import math
 import shutil
 
 import requests
 from google.cloud import storage
 from spleeter.separator import Separator
+from pydub import AudioSegment
 
 from enum import Enum
 
@@ -75,22 +77,57 @@ async def separate(request: SeparateRequest, background_tasks: BackgroundTasks):
 def process(request, bucket_name, path_to_file, file_ext, result_folder):
     bucket = storage_client.get_bucket(bucket_name)
     file = bucket.get_blob(path_to_file)
-    with open(f"{input_files_path}/{request.id}.{file_ext}", "wb+") as file_in:
+    request_input_path = f"{input_files_path}/{request.id}"
+    request_output_path = f"{output_files_path}/{request.id}"
+    if not os.path.exists(request_input_path):
+        os.mkdir(request_input_path)
+    if not os.path.exists(request_output_path):
+        os.mkdir(request_output_path)
+    with open(f"{request_input_path}/{request.id}.{file_ext}", "wb+") as file_in:
         file.download_to_file(file_in)
-    if file_ext == CodecsIn.webm.value:
-        new_ext = CodecsIn.wav.value
-        os.system(f"ffmpeg -i \"{input_files_path}/{request.id}.{file_ext}\" -vn -y \"{input_files_path}/{request.id}.{new_ext}\"")
-        os.remove(f"{input_files_path}/{request.id}.{file_ext}")
-        file_ext = new_ext
 
-    separator.separate_to_file(f"{input_files_path}/{request.id}.{file_ext}", output_files_path, codec=request.outputSoundFormat.value, duration=36000)
+    song = AudioSegment.from_file(f"{request_input_path}/{request.id}.{file_ext}", file_ext)
+
+    if 'SPLITTING_FREQUENCY' in os.environ:
+        splitting_frequency = int(os.getenv('SPLITTING_FREQUENCY'))
+    else:
+        splitting_frequency = 10
+
+    segments_count = math.ceil(song.duration_seconds / (splitting_frequency * 60))
+    for i in range(segments_count):
+        m1 = i * splitting_frequency * 60000
+        m2 = (i + 1) * splitting_frequency * 60000
+        segment = song[m1:m2]
+        segment_path = f"{request_input_path}/{request.id}-segment{i}.wav"
+        segment.export(segment_path, format='wav')
+        separator.separate_to_file(segment_path, request_output_path, codec=request.outputSoundFormat.value, duration=splitting_frequency*60)
+
+    speech_start_segment = AudioSegment.from_file(f"{request_output_path}/{request.id}-segment0/vocals.{request.outputSoundFormat.value}", request.outputSoundFormat.value)
+    background_start_segment = AudioSegment.from_file(f"{request_output_path}/{request.id}-segment0/accompaniment.{request.outputSoundFormat.value}", request.outputSoundFormat.value)
+    if segments_count > 1:
+        for i in range(segments_count):
+            speech_result = speech_start_segment + AudioSegment.from_file(
+                f"{request_output_path}/{request.id}-segment{i}/vocals.{request.outputSoundFormat.value}",
+                request.outputSoundFormat.value)
+            background_result = background_start_segment + AudioSegment.from_file(
+                f"{request_output_path}/{request.id}-segment{i}/accompaniment.{request.outputSoundFormat.value}",
+                request.outputSoundFormat.value)
+            speech_start_segment = speech_result
+            background_start_segment = background_result
+    else:
+        speech_result = speech_start_segment
+        background_result = background_start_segment
+    speech_result.export(f"{request_output_path}/speech.{request.outputSoundFormat.value}",
+                         format=request.outputSoundFormat.value)
+    background_result.export(f"{request_output_path}/background.{request.outputSoundFormat.value}",
+                             format=request.outputSoundFormat.value)
 
     vocal_blob = bucket.blob(f"{result_folder}/speech.{request.outputSoundFormat.value}")
-    vocal_blob.upload_from_filename(f"{output_files_path}/{request.id}/vocals.{request.outputSoundFormat.value}")
+    vocal_blob.upload_from_filename(f"{request_output_path}/speech.{request.outputSoundFormat.value}")
     accompaniment_blob = bucket.blob(f"{result_folder}/background.{request.outputSoundFormat.value}")
-    accompaniment_blob.upload_from_filename(f"{output_files_path}/{request.id}/accompaniment.{request.outputSoundFormat.value}")
-    shutil.rmtree(f"{output_files_path}/{request.id}")
-    os.remove(f"{input_files_path}/{request.id}.{file_ext}")
-
+    accompaniment_blob.upload_from_filename(f"{request_output_path}/background.{request.outputSoundFormat.value}")
     if 'WEBHOOK_HOST' in os.environ:
         requests.post(f"{os.getenv('WEBHOOK_HOST')}/api/v1/orders/{request.id}/audio_split_finished")
+
+    shutil.rmtree(f"{request_input_path}")
+    shutil.rmtree(f"{request_output_path}")
