@@ -1,0 +1,17 @@
+version: '3'
+services:
+  spleeter:
+    build:
+      context: ..
+      dockerfile: ./docker/Dockerfile
+    ports:
+      - 8000:8000
+    volumes:
+      - gcp_vidby_key:/gcp
+    environment:
+      GOOGLE_APPLICATION_CREDENTIALS: /gcp/gcp_vidby_key.json
+      WEBHOOK_HOST: http://staging.vidby.com
+
+volumes:
+  gcp_vidby_key:
+    external: true
