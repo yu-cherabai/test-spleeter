@@ -100,8 +100,8 @@ def process(request, bucket_name, path_to_file, file_ext, result_folder):
         m1 = i * splitting_frequency * 60000
         m2 = (i + 1) * splitting_frequency * 60000
         segment = song[m1:m2]
-        segment_path = f"{request_input_path}/{request.id}-segment{i}.wav"
-        segment.export(segment_path, format='wav')
+        segment_path = f"{request_input_path}/{request.id}-segment{i}.mp3"
+        segment.export(segment_path, format='mp3')
         separator.separate_to_file(segment_path, request_output_path, codec=request.outputSoundFormat.value, duration=splitting_frequency*60)
 
     speech_start_segment = AudioSegment.from_file(f"{request_output_path}/{request.id}-segment0/vocals.{request.outputSoundFormat.value}", request.outputSoundFormat.value)
