@@ -22,6 +22,8 @@ input_files_path = '/tmp/input_files'
 output_files_path = '/tmp/separation_results'
 if not os.path.exists(input_files_path):
     os.mkdir(input_files_path)
+if not os.path.exists(output_files_path):
+    os.mkdir(output_files_path)
 
 
 class CodecsIn(Enum):
