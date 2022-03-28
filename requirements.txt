@@ -2,6 +2,7 @@
 spleeter==2.3.0
 ffmpeg-python==0.2.0
 pydub==0.25.1
+persist-queue==0.7.0
 
 # GCP
 google-cloud-storage==2.2.1
