@@ -1,19 +1,28 @@
 import os
 import math
 import shutil
+from threading import Thread
 
 import requests
+import persistqueue
 from google.cloud import storage
 from spleeter.separator import Separator
 from pydub import AudioSegment
 
 from enum import Enum
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 
 app = FastAPI()
+
+if 'PROCESSING_THREADS' in os.environ:
+    processing_threads = int(os.getenv('PROCESSING_THREADS'))
+else:
+    processing_threads = 1
+
+queue = persistqueue.FIFOSQLiteQueue(path='/tmp/separation-queue', multithreading=True, auto_commit=False if processing_threads == 1 else True)
 
 storage_client = storage.Client()
 separator = Separator('spleeter:2stems')
@@ -24,6 +33,25 @@ if not os.path.exists(input_files_path):
     os.mkdir(input_files_path)
 if not os.path.exists(output_files_path):
     os.mkdir(output_files_path)
+
+
+def listener():
+    while True:
+        item = queue.get()
+        process(
+            item['request'],
+            item['bucket_name'],
+            item['path_to_file'],
+            item['file_ext']
+        )
+        if processing_threads == 1:
+            queue.task_done()
+
+
+for i in range(processing_threads):
+    t = Thread(target=listener)
+    t.daemon = True
+    t.start()
 
 
 class CodecsIn(Enum):
@@ -54,7 +82,7 @@ class SeparateResponse(BaseModel):
 
 
 @app.post("/separate", response_model=SeparateResponse)
-async def separate(request: SeparateRequest, background_tasks: BackgroundTasks):
+async def separate(request: SeparateRequest):
     try:
         path_parts = request.path[5:].split('/', 1)
         bucket_name = path_parts[0]
@@ -65,26 +93,33 @@ async def separate(request: SeparateRequest, background_tasks: BackgroundTasks):
     if request.inputSoundFormat.value != file_ext:
         raise HTTPException(status_code=400, detail='Invalid input sound format.')
 
-    result_folder = f"results/{request.id}"
+    separating_request = {
+        'request': request,
+        'bucket_name': bucket_name,
+        'path_to_file': path_to_file,
+        'file_ext': file_ext
+    }
 
-    background_tasks.add_task(process, request, bucket_name, path_to_file, file_ext, result_folder)
+    queue.put(separating_request)
 
     return {
         "path": request.path,
         "id": request.id,
-        "outputFolderPath": f"gs://{bucket_name}/{result_folder}"
+        "outputFolderPath": f"gs://{bucket_name}/results/{request.id}"
     }
 
 
-def process(request, bucket_name, path_to_file, file_ext, result_folder):
+def process(request, bucket_name, path_to_file, file_ext):
     bucket = storage_client.get_bucket(bucket_name)
     file = bucket.get_blob(path_to_file)
     request_input_path = f"{input_files_path}/{request.id}"
     request_output_path = f"{output_files_path}/{request.id}"
-    if not os.path.exists(request_input_path):
-        os.mkdir(request_input_path)
-    if not os.path.exists(request_output_path):
-        os.mkdir(request_output_path)
+    if os.path.exists(request_input_path):
+        shutil.rmtree(request_input_path)
+    os.mkdir(request_input_path)
+    if os.path.exists(request_output_path):
+        shutil.rmtree(request_output_path)
+    os.mkdir(request_output_path)
     with open(f"{request_input_path}/{request.id}.{file_ext}", "wb+") as file_in:
         file.download_to_file(file_in)
 
@@ -124,9 +159,9 @@ def process(request, bucket_name, path_to_file, file_ext, result_folder):
     background_result.export(f"{request_output_path}/background.{request.outputSoundFormat.value}",
                              format=request.outputSoundFormat.value)
 
-    vocal_blob = bucket.blob(f"{result_folder}/speech.{request.outputSoundFormat.value}")
+    vocal_blob = bucket.blob(f"results/{request.id}/speech.{request.outputSoundFormat.value}")
     vocal_blob.upload_from_filename(f"{request_output_path}/speech.{request.outputSoundFormat.value}")
-    accompaniment_blob = bucket.blob(f"{result_folder}/background.{request.outputSoundFormat.value}")
+    accompaniment_blob = bucket.blob(f"results/{request.id}/background.{request.outputSoundFormat.value}")
     accompaniment_blob.upload_from_filename(f"{request_output_path}/background.{request.outputSoundFormat.value}")
     if 'WEBHOOK_HOST' in os.environ:
         requests.post(f"{os.getenv('WEBHOOK_HOST')}/api/v1/orders/{request.id}/audio_split_finished")
