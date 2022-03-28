@@ -17,12 +17,7 @@ from pydantic import BaseModel
 
 app = FastAPI()
 
-if 'PROCESSING_THREADS' in os.environ:
-    processing_threads = int(os.getenv('PROCESSING_THREADS'))
-else:
-    processing_threads = 1
-
-queue = persistqueue.FIFOSQLiteQueue(path='/tmp/separation-queue', multithreading=True, auto_commit=False if processing_threads == 1 else True)
+queue = persistqueue.FIFOSQLiteQueue(path='/tmp/separation-queue', multithreading=True, auto_commit=False)
 
 storage_client = storage.Client()
 separator = Separator('spleeter:2stems')
@@ -44,14 +39,12 @@ def listener():
             item['path_to_file'],
             item['file_ext']
         )
-        if processing_threads == 1:
-            queue.task_done()
+        queue.task_done()
 
 
-for i in range(processing_threads):
-    t = Thread(target=listener)
-    t.daemon = True
-    t.start()
+t = Thread(target=listener)
+t.daemon = True
+t.start()
 
 
 class CodecsIn(Enum):
