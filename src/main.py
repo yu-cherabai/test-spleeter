@@ -1,23 +1,24 @@
 import os
 import math
 import shutil
-from threading import Thread
 
 import requests
-import persistqueue
 from google.cloud import storage
 from spleeter.separator import Separator
 from pydub import AudioSegment
 
 from enum import Enum
 
+from celery import Celery
+from celery.signals import worker_init
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-
 app = FastAPI()
 
-queue = persistqueue.FIFOSQLiteQueue(path='/tmp/separation-queue', multithreading=True, auto_commit=False)
+celery = Celery(__name__)
+celery.conf.broker_url = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379")
+celery.conf.result_backend = os.environ.get("CELERY_RESULT_BACKEND", "redis://localhost:6379")
 
 storage_client = storage.Client()
 separator = Separator('spleeter:2stems')
@@ -28,23 +29,6 @@ if not os.path.exists(input_files_path):
     os.mkdir(input_files_path)
 if not os.path.exists(output_files_path):
     os.mkdir(output_files_path)
-
-
-def listener():
-    while True:
-        item = queue.get()
-        process(
-            item['request'],
-            item['bucket_name'],
-            item['path_to_file'],
-            item['file_ext']
-        )
-        queue.task_done()
-
-
-t = Thread(target=listener)
-t.daemon = True
-t.start()
 
 
 class CodecsIn(Enum):
@@ -86,14 +70,7 @@ async def separate(request: SeparateRequest):
     if request.inputSoundFormat.value != file_ext:
         raise HTTPException(status_code=400, detail='Invalid input sound format.')
 
-    separating_request = {
-        'request': request,
-        'bucket_name': bucket_name,
-        'path_to_file': path_to_file,
-        'file_ext': file_ext
-    }
-
-    queue.put(separating_request)
+    process.delay(request.id, request.outputSoundFormat.value, bucket_name, path_to_file, file_ext)
 
     return {
         "path": request.path,
@@ -102,21 +79,24 @@ async def separate(request: SeparateRequest):
     }
 
 
-def process(request, bucket_name, path_to_file, file_ext):
+@celery.task(
+    acks_late=True
+)
+def process(request_id, output_sound_format, bucket_name, path_to_file, file_ext):
     bucket = storage_client.get_bucket(bucket_name)
     file = bucket.get_blob(path_to_file)
-    request_input_path = f"{input_files_path}/{request.id}"
-    request_output_path = f"{output_files_path}/{request.id}"
+    request_input_path = f"{input_files_path}/{request_id}"
+    request_output_path = f"{output_files_path}/{request_id}"
     if os.path.exists(request_input_path):
         shutil.rmtree(request_input_path)
     os.mkdir(request_input_path)
     if os.path.exists(request_output_path):
         shutil.rmtree(request_output_path)
     os.mkdir(request_output_path)
-    with open(f"{request_input_path}/{request.id}.{file_ext}", "wb+") as file_in:
+    with open(f"{request_input_path}/{request_id}.{file_ext}", "wb+") as file_in:
         file.download_to_file(file_in)
 
-    song = AudioSegment.from_file(f"{request_input_path}/{request.id}.{file_ext}", file_ext)
+    song = AudioSegment.from_file(f"{request_input_path}/{request_id}.{file_ext}", file_ext)
 
     if 'SPLITTING_FREQUENCY' in os.environ:
         splitting_frequency = int(os.getenv('SPLITTING_FREQUENCY'))
@@ -128,36 +108,43 @@ def process(request, bucket_name, path_to_file, file_ext):
         m1 = i * splitting_frequency * 60000
         m2 = (i + 1) * splitting_frequency * 60000
         segment = song[m1:m2]
-        segment_path = f"{request_input_path}/{request.id}-segment{i}.mp3"
+        segment_path = f"{request_input_path}/{request_id}-segment{i}.mp3"
         segment.export(segment_path, format='mp3')
-        separator.separate_to_file(segment_path, request_output_path, codec=request.outputSoundFormat.value, duration=splitting_frequency*60)
+        separator.separate_to_file(segment_path, request_output_path, codec=output_sound_format, duration=splitting_frequency*60)
 
-    speech_start_segment = AudioSegment.from_file(f"{request_output_path}/{request.id}-segment0/vocals.{request.outputSoundFormat.value}", request.outputSoundFormat.value)
-    background_start_segment = AudioSegment.from_file(f"{request_output_path}/{request.id}-segment0/accompaniment.{request.outputSoundFormat.value}", request.outputSoundFormat.value)
+    speech_start_segment = AudioSegment.from_file(f"{request_output_path}/{request_id}-segment0/vocals.{output_sound_format}", output_sound_format)
+    background_start_segment = AudioSegment.from_file(f"{request_output_path}/{request_id}-segment0/accompaniment.{output_sound_format}", output_sound_format)
     if segments_count > 1:
         for i in range(segments_count):
             speech_result = speech_start_segment + AudioSegment.from_file(
-                f"{request_output_path}/{request.id}-segment{i}/vocals.{request.outputSoundFormat.value}",
-                request.outputSoundFormat.value)
+                f"{request_output_path}/{request_id}-segment{i}/vocals.{output_sound_format}", output_sound_format)
             background_result = background_start_segment + AudioSegment.from_file(
-                f"{request_output_path}/{request.id}-segment{i}/accompaniment.{request.outputSoundFormat.value}",
-                request.outputSoundFormat.value)
+                f"{request_output_path}/{request_id}-segment{i}/accompaniment.{output_sound_format}", output_sound_format)
             speech_start_segment = speech_result
             background_start_segment = background_result
     else:
         speech_result = speech_start_segment
         background_result = background_start_segment
-    speech_result.export(f"{request_output_path}/speech.{request.outputSoundFormat.value}",
-                         format=request.outputSoundFormat.value)
-    background_result.export(f"{request_output_path}/background.{request.outputSoundFormat.value}",
-                             format=request.outputSoundFormat.value)
+    speech_result.export(f"{request_output_path}/speech.{output_sound_format}", format=output_sound_format)
+    background_result.export(f"{request_output_path}/background.{output_sound_format}", format=output_sound_format)
 
-    vocal_blob = bucket.blob(f"results/{request.id}/speech.{request.outputSoundFormat.value}")
-    vocal_blob.upload_from_filename(f"{request_output_path}/speech.{request.outputSoundFormat.value}")
-    accompaniment_blob = bucket.blob(f"results/{request.id}/background.{request.outputSoundFormat.value}")
-    accompaniment_blob.upload_from_filename(f"{request_output_path}/background.{request.outputSoundFormat.value}")
+    vocal_blob = bucket.blob(f"results/{request_id}/speech.{output_sound_format}")
+    vocal_blob.upload_from_filename(f"{request_output_path}/speech.{output_sound_format}")
+    accompaniment_blob = bucket.blob(f"results/{request_id}/background.{output_sound_format}")
+    accompaniment_blob.upload_from_filename(f"{request_output_path}/background.{output_sound_format}")
     if 'WEBHOOK_HOST' in os.environ:
-        requests.post(f"{os.getenv('WEBHOOK_HOST')}/api/v1/orders/{request.id}/audio_split_finished")
+        requests.post(f"{os.getenv('WEBHOOK_HOST')}/api/v1/orders/{request_id}/audio_split_finished")
 
     shutil.rmtree(f"{request_input_path}")
     shutil.rmtree(f"{request_output_path}")
+
+
+def restore_all_unacknowledged_messages():
+    conn = celery.connection(transport_options={'visibility_timeout': 0})
+    qos = conn.channel().qos
+    qos.restore_visible()
+
+
+@worker_init.connect
+def worker_init(sender=None, conf=None, **kwargs):
+    restore_all_unacknowledged_messages()
