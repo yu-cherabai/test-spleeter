@@ -1,6 +1,7 @@
 import requests
 
-from celery import Celery, worker_init
+from celery import Celery
+from celery.signals import worker_init
 from src.constants import FOLDER_PROCESSING, AUDIO_SPLIT_SERVICE_CELERY_BROKER_URL, WEBHOOK_HOST
 from src.gcp import download_file, upload_file, extract_bucket_name_from_gs_path
 from src.models import SeparateRequest
