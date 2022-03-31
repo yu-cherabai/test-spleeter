@@ -1,0 +1,19 @@
+import os
+
+from src.enums import CodecsIn
+
+# ENV CONSTANTS
+SPLITTING_FREQUENCY = int(os.environ.get('SPLITTING_FREQUENCY', "10"))
+
+AUDIO_SPLIT_SERVICE_CELERY_BROKER_URL = os.environ.get('AUDIO_SPLIT_SERVICE_CELERY_BROKER_URL', 'redis://localhost:6379')
+
+WEBHOOK_HOST = os.environ.get('WEBHOOK_HOST', None)
+
+# NOT ENV CONSTANTS
+FOLDER_PROCESSING = '/tmp/spleeter_processing'
+
+ONE_MINUTE_IN_MILLISECONDS = 60000
+
+ONE_MINUTE_IN_SECONDS = 60
+
+SEGMENTS_EXTENSION = CodecsIn.mp3.value

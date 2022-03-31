@@ -5,7 +5,7 @@ pydub==0.25.1
 
 # Task queue
 redis==4.2.0
-celery==5.2.3
+celery==5.1.0
 
 # GCP
 google-cloud-storage==2.2.1

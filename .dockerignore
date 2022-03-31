@@ -1,0 +1,5 @@
+.idea
+docker
+.dockerignore
+Dockerfile
+venv

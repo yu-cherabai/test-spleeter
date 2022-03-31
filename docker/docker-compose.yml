@@ -7,15 +7,15 @@ services:
   spleeter:
     build:
       context: ..
-      dockerfile: ./docker/Dockerfile
+      dockerfile: ./Dockerfile
     ports:
       - 8000:8000
     volumes:
       - gcp_vidby_key:/gcp
     environment:
       GOOGLE_APPLICATION_CREDENTIALS: /gcp/gcp_vidby_key.json
-      WEBHOOK_HOST: http://staging.vidby.com
       SPLITTING_FREQUENCY: 10
+      AUDIO_SPLIT_SERVICE_CELERY_BROKER_URL: redis://redis:6379
     depends_on:
       - redis
 
