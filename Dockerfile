@@ -10,4 +10,4 @@ RUN pip3 install -r requirements.txt
 
 EXPOSE 8000
 
-CMD celery -A src.celery.celery worker -l INFO --pool solo -D && uvicorn src.main:app --host 0.0.0.0
+CMD celery -A src.celery_tasks.celery worker -l INFO --pool solo -D && uvicorn src.main:app --host 0.0.0.0
