@@ -11,8 +11,6 @@ def download_file(gs_path, save_path):
     with open(save_path, 'wb+') as downloaded_file:
         file.download_to_file(downloaded_file)
 
-    return save_path
-
 
 def upload_file(bucket_name, file_path, file_path_in_bucket):
     bucket = storage_client.get_bucket(bucket_name)

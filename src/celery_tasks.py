@@ -2,6 +2,8 @@ import requests
 
 from celery import Celery
 from celery.signals import worker_init
+from pydantic import parse_raw_as
+
 from src.constants import FOLDER_PROCESSING, AUDIO_SPLIT_SERVICE_CELERY_BROKER_URL, WEBHOOK_HOST
 from src.gcp import download_file, upload_file, extract_bucket_name_from_gs_path
 from src.models import SeparateRequest
@@ -21,7 +23,8 @@ celery = get_celery()
 @celery.task(
     acks_late=True
 )
-def process(request: SeparateRequest):
+def process(request_json: str):
+    request: SeparateRequest = parse_raw_as(SeparateRequest, request_json)
     request_folder = f'{FOLDER_PROCESSING}/{request.id}'
     downloaded_file_path = f'{request_folder}/{request.id}.{request.inputSoundFormat.value}'
 
