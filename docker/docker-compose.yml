@@ -6,8 +6,8 @@ services:
       - 6379:6379
   web:
     build:
-      context: .
-      dockerfile: /web/Dockerfile
+      context: ./web
+      dockerfile: ./Dockerfile
     ports:
       - 8000:8000
     volumes:
@@ -21,8 +21,8 @@ services:
       - redis
   celery:
     build:
-      context: .
-      dockerfile: /celery/Dockerfile
+      context: ./celery
+      dockerfile: ./Dockerfile
     volumes:
       - gcp_vidby_key:/gcp
     environment:
