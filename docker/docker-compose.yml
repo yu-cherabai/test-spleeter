@@ -4,10 +4,10 @@ services:
     image: redis:alpine
     ports:
       - 6379:6379
-  web:
+  spleeter:
     build:
       context: ..
-      dockerfile: ./docker/web/Dockerfile
+      dockerfile: ./Dockerfile
     ports:
       - 8000:8000
     volumes:
@@ -22,7 +22,8 @@ services:
   celery:
     build:
       context: ..
-      dockerfile: ./docker/celery/Dockerfile
+      dockerfile: ./Dockerfile
+    command: celery -A src.celery_tasks.celery worker -l INFO --pool solo
     volumes:
       - gcp_vidby_key:/gcp
     environment:
@@ -32,7 +33,6 @@ services:
       AUDIO_SPLIT_SERVICE_CELERY_BROKER_URL: redis://redis:6379
     depends_on:
       - redis
-
 
 volumes:
   gcp_vidby_key:

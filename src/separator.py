@@ -4,6 +4,7 @@ from pydub import AudioSegment
 from spleeter.separator import Separator
 
 from src.constants import SPLITTING_FREQUENCY, ONE_MINUTE_IN_MILLISECONDS, ONE_MINUTE_IN_SECONDS, SEGMENTS_EXTENSION
+from src.gcp import upload_file
 
 spleeter = Separator('spleeter:2stems')
 
@@ -20,6 +21,14 @@ def separate_by_chunks(file_to_separate_path, result_folder, input_format, outpu
         segment.export(segment_path, format=SEGMENTS_EXTENSION)
         spleeter.separate_to_file(segment_path, result_folder,
                                   codec=output_format, duration=SPLITTING_FREQUENCY * ONE_MINUTE_IN_SECONDS)
+        upload_file(
+            'vidby-test',
+            f'{result_folder}/segment{i}/vocals.{output_format}',
+            f'results/fuckingtest/speach{i}.{output_format}')
+        upload_file(
+            'vidby-test',
+            f'{result_folder}/segment{i}/accompaniment.{output_format}',
+            f'results/fuckingtest/background{i}.{output_format}')
 
     join_separated_segments(segments_count, result_folder, output_format)
 
