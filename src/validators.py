@@ -6,7 +6,7 @@ def is_separate_request_valid(request: SeparateRequest) -> bool:
         return False
 
     file_ext = request.path.split('.', 1)[1]
-    if file_ext != request.inputSoundFormat.value:
+    if file_ext != request.input_sound_format.value:
         return False
 
     return True

@@ -26,20 +26,20 @@ celery = get_celery()
 def process(request_json: str):
     request: SeparateRequest = parse_raw_as(SeparateRequest, request_json)
     request_folder = f'{FOLDER_PROCESSING}/{request.id}'
-    downloaded_file_path = f'{request_folder}/{request.id}.{request.inputSoundFormat.value}'
+    downloaded_file_path = f'{request_folder}/{request.id}.{request.input_sound_format.value}'
 
     create_request_folder(request_folder)
     download_file(request.path, downloaded_file_path)
 
     separate_by_chunks(
-        downloaded_file_path, request.id, request_folder, request.inputSoundFormat.value, request.outputSoundFormat.value)
+        downloaded_file_path, request.id, request_folder, request.input_sound_format.value, request.output_sound_format.value)
 
     upload_file(
-        f'{request_folder}/speach.{request.outputSoundFormat.value}',
-        f'results/{request.id}/speach.{request.outputSoundFormat.value}')
+        f'{request_folder}/speach.{request.output_sound_format.value}',
+        f'results/{request.id}/speach.{request.output_sound_format.value}')
     upload_file(
-        f'{request_folder}/background.{request.outputSoundFormat.value}',
-        f'results/{request.id}/background.{request.outputSoundFormat.value}'
+        f'{request_folder}/background.{request.output_sound_format.value}',
+        f'results/{request.id}/background.{request.output_sound_format.value}'
     )
 
     send_notification(request.id)
