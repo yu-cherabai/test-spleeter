@@ -4,7 +4,7 @@ import os
 
 from spleeter.separator import Separator
 
-from src.constants import SPLITTING_FREQUENCY, ONE_MINUTE_IN_MILLISECONDS, ONE_MINUTE_IN_SECONDS, CONVERTED_CODEC_EXT
+from src.constants import SPLITTING_FREQUENCY, ONE_MINUTE_IN_SECONDS, CONVERTED_CODEC_EXT
 from src.enums import CodecsIn
 
 spleeter = Separator('spleeter:2stems')
@@ -16,7 +16,7 @@ def separate_by_chunks(file_to_separate_path, file_name, result_folder, input_fo
     segments_count = math.ceil(audio_duration / (SPLITTING_FREQUENCY * ONE_MINUTE_IN_SECONDS))
 
     for i in range(segments_count):
-        segment_start = i * SPLITTING_FREQUENCY * ONE_MINUTE_IN_MILLISECONDS
+        segment_start = i * SPLITTING_FREQUENCY * ONE_MINUTE_IN_SECONDS
         segment_path = f'{result_folder}/segment{i}.{CONVERTED_CODEC_EXT}'
         os.system(f'ffmpeg -ss {segment_start} -i "{file_to_separate_path}" -c copy -t {SPLITTING_FREQUENCY * ONE_MINUTE_IN_SECONDS} "{segment_path}"')
         spleeter.separate_to_file(segment_path, result_folder,
