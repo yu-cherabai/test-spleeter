@@ -17,7 +17,7 @@ celery = get_celery()
 
 @celery.task(
     autoretry_for=(Exception,),
-    default_retry_delay=(5,),
+    default_retry_delay=5,
     acks_late=True,
     max_retries=5
 )
