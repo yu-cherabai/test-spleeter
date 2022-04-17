@@ -1,3 +1,5 @@
+import logging
+
 import requests
 
 from celery import Celery
@@ -29,11 +31,14 @@ def process(request_json: str):
     downloaded_file_path = f'{request_folder}/{request.id}.{request.input_sound_format.value}'
 
     create_request_folder(request_folder)
+    logging.info('Start downloading a file from the bucket.')
     download_file(request.path, downloaded_file_path)
+    logging.info('File downloaded from the bucket.')
 
     separate_by_chunks(
         downloaded_file_path, request.id, request_folder, request.input_sound_format.value, request.output_sound_format.value)
 
+    logging.info('Start uploading results of separation.')
     upload_file(
         f'{request_folder}/speach.{request.output_sound_format.value}',
         f'results/{request.id}/speach.{request.output_sound_format.value}')
@@ -41,6 +46,7 @@ def process(request_json: str):
         f'{request_folder}/background.{request.output_sound_format.value}',
         f'results/{request.id}/background.{request.output_sound_format.value}'
     )
+    logging.info('Results uploaded.')
 
     send_notification(request.id)
 
@@ -49,6 +55,7 @@ def process(request_json: str):
 
 def send_notification(request_id):
     if WEBHOOK_HOST:
+        logging.info('Send notification of successful file separation.')
         requests.post(f'{WEBHOOK_HOST}/api/v1/orders/{request_id}/audio_split_finished')
 
 
