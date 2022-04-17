@@ -20,7 +20,7 @@ celery = get_celery()
     acks_late=True,
     max_retries=5
 )
-def process(self, request_json: str):
+def process(request_json: str):
     request: SeparateRequest = parse_raw_as(SeparateRequest, request_json)
     print('START')
     raise Exception
