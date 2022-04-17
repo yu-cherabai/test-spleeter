@@ -7,10 +7,6 @@ GOOGLE_AUDIO_SPLIT_STORAGE_BUCKET = os.environ.get('GOOGLE_AUDIO_SPLIT_STORAGE_B
 
 SPLITTING_FREQUENCY = int(os.environ.get('SPLITTING_FREQUENCY', "2"))
 
-# os.environ['CELERY_BROKER_URL'] = os.environ.get(
-#     'AUDIO_SPLIT_SERVICE_CELERY_BROKER_URL', 'redis://localhost:6379/5'
-# )
-
 WEBHOOK_HOST = os.environ.get('WEBHOOK_HOST', None)
 
 # NOT ENV CONSTANTS

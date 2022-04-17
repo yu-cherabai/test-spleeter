@@ -10,22 +10,30 @@ services:
       dockerfile: ./Dockerfile
     ports:
       - 8000:8000
+    volumes:
+      - gcp_vidby_key:/gcp
     environment:
       GOOGLE_APPLICATION_CREDENTIALS: /gcp/gcp_vidby_key.json
       GOOGLE_AUDIO_SPLIT_STORAGE_BUCKET: vidby-test
       WEBHOOK_HOST: http://staging.vidby.com
       SPLITTING_FREQUENCY: 10
-      AUDIO_SPLIT_SERVICE_CELERY_BROKER_URL: redis://redis:6379
+      AUDIO_SPLIT_SERVICE_CELERY_BROKER_URL: redis://redis:6379/5
   celery:
     build:
       context: ..
       dockerfile: ./Dockerfile
     command: celery -A src.celery_tasks.celery worker -l INFO --pool solo
+    volumes:
+      - gcp_vidby_key:/gcp
     environment:
       GOOGLE_APPLICATION_CREDENTIALS: /gcp/gcp_vidby_key.json
       GOOGLE_AUDIO_SPLIT_STORAGE_BUCKET: vidby-test
       WEBHOOK_HOST: http://staging.vidby.com
       SPLITTING_FREQUENCY: 10
-      AUDIO_SPLIT_SERVICE_CELERY_BROKER_URL: redis://redis:6379
+      AUDIO_SPLIT_SERVICE_CELERY_BROKER_URL: redis://redis:6379/5
     depends_on:
       - redis
+
+volumes:
+  gcp_vidby_key:
+    external: true

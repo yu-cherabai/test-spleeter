@@ -1,1 +1,3 @@
-BROKER_URL = 'redis://redis:6379'
+import os
+
+BROKER_URL = os.environ.get('AUDIO_SPLIT_SERVICE_CELERY_BROKER_URL', 'redis://localhost:6379/5')
