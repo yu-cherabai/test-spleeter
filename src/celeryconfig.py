@@ -1,1 +1,1 @@
-CELERY_BROKER_URL = 'redis://localhost:6379'
+BROKER_URL = 'redis://localhost:6379/5'
