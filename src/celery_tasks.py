@@ -21,7 +21,9 @@ celery = get_celery()
 )
 def process(request_json: str):
     request: SeparateRequest = parse_raw_as(SeparateRequest, request_json)
-    print('123')
+    print('START')
+    raise Exception
+    print('END')
 
 
 def restore_all_unacknowledged_messages():
