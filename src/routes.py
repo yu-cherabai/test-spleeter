@@ -2,7 +2,6 @@ from fastapi import APIRouter, HTTPException
 from starlette.status import HTTP_400_BAD_REQUEST
 
 from src.celery_tasks import process
-from src.gcp import extract_bucket_name_from_gs_path
 from src.models import SeparateResponse, SeparateRequest
 from src.validators import is_separate_request_valid
 
@@ -19,5 +18,5 @@ async def separate(request: SeparateRequest):
     return {
         'path': request.path,
         'id': request.id,
-        'outputFolderPath': f'gs://{extract_bucket_name_from_gs_path(request.path)}/results/{request.id}'
+        'output_folder_path': f'results/{request.id}'
     }

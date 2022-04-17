@@ -4,21 +4,12 @@ services:
     image: redis:alpine
     ports:
       - 6379:6379
-  spleeter:
+  web:
     build:
       context: ..
       dockerfile: ./Dockerfile
     ports:
       - 8000:8000
-    volumes:
-      - gcp_vidby_key:/gcp
-    environment:
-      GOOGLE_APPLICATION_CREDENTIALS: /gcp/gcp_vidby_key.json
-      WEBHOOK_HOST: http://staging.vidby.com
-      SPLITTING_FREQUENCY: 10
-      AUDIO_SPLIT_SERVICE_CELERY_BROKER_URL: redis://redis:6379
-    depends_on:
-      - redis
   celery:
     build:
       context: ..
@@ -28,9 +19,10 @@ services:
       - gcp_vidby_key:/gcp
     environment:
       GOOGLE_APPLICATION_CREDENTIALS: /gcp/gcp_vidby_key.json
+      GOOGLE_AUDIO_SPLIT_STORAGE_BUCKET: vidby-test
       WEBHOOK_HOST: http://staging.vidby.com
       SPLITTING_FREQUENCY: 10
-      AUDIO_SPLIT_SERVICE_CELERY_BROKER_URL: redis://redis:6379
+      AUDIO_SPLIT_SERVICE_CELERY_BROKER_URL: redis://redis:6379/5
     depends_on:
       - redis
 
