@@ -16,10 +16,11 @@ celery = get_celery()
 
 
 @celery.task(
+    autoretry_for=(Exception,),
     acks_late=True,
     max_retries=5
 )
-def process(request_json: str):
+def process(self, request_json: str):
     request: SeparateRequest = parse_raw_as(SeparateRequest, request_json)
     print('START')
     raise Exception
