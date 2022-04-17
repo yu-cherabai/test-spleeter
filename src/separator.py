@@ -1,5 +1,6 @@
 import math
 import os
+import logging
 
 from pydub import AudioSegment
 from spleeter.separator import Separator
@@ -26,11 +27,12 @@ def separate_by_chunks(file_to_separate_path, result_folder, input_format, outpu
 
 
 def join_separated_segments(segments_count, folder, file_format):
-
     generate_segments_list_files(segments_count, folder, file_format)
 
+    logging.info('Starting join of separated segments.')
     os.system(f"ffmpeg -f concat -safe 0 -i {folder}/speach_segments.txt -c copy {folder}/speach.{file_format}")
     os.system(f"ffmpeg -f concat -safe 0 -i {folder}/background_segments.txt -c copy {folder}/background.{file_format}")
+    logging.info('End join of separated segments.')
 
 
 def generate_segments_list_files(segments_count, folder, file_format):
