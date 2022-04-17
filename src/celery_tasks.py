@@ -3,11 +3,11 @@ from celery.signals import worker_init
 from pydantic import parse_raw_as
 
 from src.models import SeparateRequest
-
+from src import celeryconfig
 
 def get_celery() -> Celery:
     celery_app = Celery(__name__)
-    celery_app.config_from_object('src.celeryconfig')
+    celery_app.config_from_object(celeryconfig)
     return celery_app
 
 
