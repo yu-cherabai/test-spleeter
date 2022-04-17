@@ -7,6 +7,7 @@ from src.models import SeparateRequest
 
 def get_celery() -> Celery:
     celery_app = Celery(__name__)
+    celery_app.config_from_object('src.celeryconfig')
     return celery_app
 
 
